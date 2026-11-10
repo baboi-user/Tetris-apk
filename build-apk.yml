@@ -1,0 +1,304 @@
+name: Build Block Stacker APK
+
+on:
+  push:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.7'
+      - name: Create project files
+        run: |
+          mkdir -p $(dirname game/settings.gradle)
+          cat > game/settings.gradle <<'EOF_0'
+          pluginManagement {
+              repositories { google(); mavenCentral(); gradlePluginPortal() }
+          }
+          dependencyResolutionManagement {
+              repositories { google(); mavenCentral() }
+          }
+          rootProject.name = 'BlockStacker'
+          include ':app'
+          EOF_0
+          mkdir -p $(dirname game/build.gradle)
+          cat > game/build.gradle <<'EOF_1'
+          plugins {
+              id 'com.android.application' version '8.5.2' apply false
+          }
+          EOF_1
+          mkdir -p $(dirname game/gradle.properties)
+          cat > game/gradle.properties <<'EOF_2'
+          org.gradle.jvmargs=-Xmx2g
+          android.useAndroidX=false
+          EOF_2
+          mkdir -p $(dirname game/app/build.gradle)
+          cat > game/app/build.gradle <<'EOF_3'
+          plugins {
+              id 'com.android.application'
+          }
+          android {
+              namespace 'com.blockstacker.game'
+              compileSdk 34
+              defaultConfig {
+                  applicationId 'com.blockstacker.game'
+                  minSdk 24
+                  targetSdk 34
+                  versionCode 1
+                  versionName '1.0'
+              }
+              compileOptions {
+                  sourceCompatibility JavaVersion.VERSION_17
+                  targetCompatibility JavaVersion.VERSION_17
+              }
+          }
+          EOF_3
+          mkdir -p $(dirname game/app/src/main/AndroidManifest.xml)
+          cat > game/app/src/main/AndroidManifest.xml <<'EOF_4'
+          <?xml version="1.0" encoding="utf-8"?>
+          <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+              <application
+                  android:label="Block Stacker"
+                  android:allowBackup="true"
+                  android:theme="@android:style/Theme.DeviceDefault.NoActionBar.Fullscreen">
+                  <activity
+                      android:name=".MainActivity"
+                      android:exported="true"
+                      android:screenOrientation="portrait"
+                      android:configChanges="orientation|screenSize|keyboardHidden">
+                      <intent-filter>
+                          <action android:name="android.intent.action.MAIN" />
+                          <category android:name="android.intent.category.LAUNCHER" />
+                      </intent-filter>
+                  </activity>
+              </application>
+          </manifest>
+          EOF_4
+          mkdir -p $(dirname game/app/src/main/java/com/blockstacker/game/MainActivity.java)
+          cat > game/app/src/main/java/com/blockstacker/game/MainActivity.java <<'EOF_5'
+          package com.blockstacker.game;
+
+          import android.app.Activity;
+          import android.os.Bundle;
+          import android.view.View;
+          import android.webkit.WebSettings;
+          import android.webkit.WebView;
+
+          public class MainActivity extends Activity {
+              private WebView web;
+
+              @Override
+              protected void onCreate(Bundle b) {
+                  super.onCreate(b);
+                  web = new WebView(this);
+                  WebSettings s = web.getSettings();
+                  s.setJavaScriptEnabled(true);
+                  s.setDomStorageEnabled(true);
+                  s.setMediaPlaybackRequiresUserGesture(false);
+                  web.setOverScrollMode(View.OVER_SCROLL_NEVER);
+                  web.setBackgroundColor(0xFFF1EFE8);
+                  web.loadUrl("file:///android_asset/index.html");
+                  setContentView(web);
+                  hideBars();
+              }
+
+              private void hideBars() {
+                  getWindow().getDecorView().setSystemUiVisibility(
+                      View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY | View.SYSTEM_UI_FLAG_FULLSCREEN
+                      | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION | View.SYSTEM_UI_FLAG_LAYOUT_STABLE
+                      | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION);
+              }
+
+              @Override
+              public void onWindowFocusChanged(boolean f) {
+                  super.onWindowFocusChanged(f);
+                  if (f) hideBars();
+              }
+
+              @Override
+              protected void onPause() {
+                  super.onPause();
+                  web.evaluateJavascript("window.pauseGame&&window.pauseGame()", null);
+                  web.onPause();
+              }
+
+              @Override
+              protected void onResume() {
+                  super.onResume();
+                  web.onResume();
+              }
+
+              @Override
+              public void onBackPressed() {
+                  web.evaluateJavascript("window.onBack&&window.onBack()", null);
+              }
+          }
+          EOF_5
+          mkdir -p $(dirname game/app/src/main/assets/index.html)
+          cat > game/app/src/main/assets/index.html <<'EOF_6'
+          <!DOCTYPE html>
+          <html><head><meta charset="utf-8">
+          <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+          <title>Block Stacker</title>
+          <style>
+          *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;user-select:none;-webkit-user-select:none}
+          html,body{margin:0;height:100%;background:#F1EFE8;color:#2C2C2A;font-family:system-ui,sans-serif;overflow:hidden;touch-action:none}
+          #app{height:100%;display:flex;flex-direction:column;padding:8px;gap:8px}
+          #top{display:flex;gap:8px;align-items:stretch}
+          .box{background:#fff;border:1px solid #D3D1C7;border-radius:8px;padding:5px 10px}
+          .box small{display:block;font-size:11px;color:#5F5E5A}
+          .box b{font-size:16px;font-weight:600}
+          #top .box{flex:1}
+          #burger{width:44px;border:1px solid #B4B2A9;border-radius:8px;background:#fff;color:#2C2C2A;display:flex;align-items:center;justify-content:center}
+          #stage{flex:1;min-height:0;display:flex;gap:8px;justify-content:center;align-items:flex-start}
+          .side{width:64px;display:flex;flex-direction:column;gap:8px}
+          .side .box{padding:4px;text-align:center}
+          #board{background:#fff;border:2px solid #888780;display:block}
+          #ctl{display:flex;flex-direction:column;align-items:center;gap:8px;padding-bottom:6px}
+          .row{display:flex;gap:8px;justify-content:center}
+          .btn{width:76px;height:58px;border:1px solid #B4B2A9;border-radius:14px;background:#fff;color:#2C2C2A;display:flex;align-items:center;justify-content:center;transition:transform .08s,background .08s}
+          .btn.w{width:116px}
+          .btn.acc{background:#E6F1FB;border-color:#85B7EB;color:#0C447C}
+          .btn:active{transform:scale(.9);background:#D3D1C7}
+          .btn svg,#burger svg{width:28px;height:28px;fill:none;stroke:currentColor;stroke-width:2.6;stroke-linecap:round;stroke-linejoin:round;transition:transform .15s}
+          .rot:active svg{transform:rotate(90deg)}
+          .drop svg .ar{animation:bob 1.1s ease-in-out infinite}
+          @keyframes bob{50%{transform:translateY(3px)}}
+          body.m-swipe #ctl{display:none}
+          body.m-buttons #stage{touch-action:none}
+          #dim{position:fixed;inset:0;background:rgba(0,0,0,.35);opacity:0;pointer-events:none;transition:opacity .2s}
+          #drawer{position:fixed;top:0;right:0;bottom:0;width:260px;background:#fff;border-left:1px solid #B4B2A9;transform:translateX(100%);transition:transform .22s;padding:16px;display:flex;flex-direction:column;gap:14px}
+          body.menu #drawer{transform:none}
+          body.menu #dim{opacity:1;pointer-events:auto}
+          #drawer h3{margin:0;font-size:18px;font-weight:600}
+          #drawer label{font-size:12px;color:#5F5E5A;display:block;margin-bottom:6px}
+          .seg{display:flex;border:1px solid #B4B2A9;border-radius:8px;overflow:hidden}
+          .seg div{flex:1;text-align:center;padding:9px 0;font-size:13px;background:#fff}
+          .seg div+div{border-left:1px solid #B4B2A9}
+          .seg .on{background:#E6F1FB;color:#0C447C;font-weight:600}
+          .mbtn{border:1px solid #B4B2A9;border-radius:8px;padding:11px;text-align:center;background:#fff;font-size:14px}
+          .mbtn.acc{background:#E6F1FB;border-color:#85B7EB;color:#0C447C}
+          #ov{position:fixed;inset:0;background:rgba(241,239,232,.92);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;text-align:center}
+          #ov h1{margin:0;font-size:26px;font-weight:600}
+          #ov p{margin:0;color:#5F5E5A;font-size:14px;white-space:pre-line}
+          #ov .mbtn{width:180px}
+          </style></head>
+          <body class="m-both">
+          <div id="app">
+           <div id="top">
+            <div class="box"><small>Score</small><b id="sc">0</b></div>
+            <div class="box"><small>Best</small><b id="bs">0</b></div>
+            <div class="box"><small>Lv</small><b id="lv">1</b></div>
+            <div id="burger" role="button" aria-label="Menu"><svg viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></svg></div>
+           </div>
+           <div id="stage">
+            <div class="side">
+             <div class="box" id="holdbox"><small>Hold</small><canvas id="hold" width="56" height="48"></canvas></div>
+             <div class="box"><small>Lines</small><b id="ln">0</b></div>
+            </div>
+            <canvas id="board"></canvas>
+            <div class="side"><div class="box"><small>Next</small><canvas id="next" width="56" height="150"></canvas></div></div>
+           </div>
+           <div id="ctl">
+            <div class="row">
+             <div class="btn" data-a="l" aria-label="Left"><svg viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg></div>
+             <div class="btn" data-a="d" aria-label="Soft drop"><svg viewBox="0 0 24 24"><path d="M5 9l7 7 7-7"/></svg></div>
+             <div class="btn" data-a="r" aria-label="Right"><svg viewBox="0 0 24 24"><path d="M9 5l7 7-7 7"/></svg></div>
+            </div>
+            <div class="row">
+             <div class="btn w rot" data-a="rot" aria-label="Rotate"><svg viewBox="0 0 24 24"><path d="M20 12a8 8 0 1 1-2.6-5.9"/><path d="M20 4v5h-5"/></svg></div>
+             <div class="btn w acc drop" data-a="hd" aria-label="Hard drop"><svg viewBox="0 0 24 24"><g class="ar"><path d="M12 3v10M7 9l5 5 5-5"/></g><path d="M5 20h14"/></svg></div>
+            </div>
+           </div>
+          </div>
+          <div id="dim"></div>
+          <div id="drawer">
+           <h3>Menu</h3>
+           <div><label>Controls</label><div class="seg" id="segmode"><div data-v="buttons">Buttons</div><div data-v="swipe">Swipe</div><div data-v="both">Both</div></div></div>
+           <div><label>Sound</label><div class="seg" id="segsnd"><div data-v="1">On</div><div data-v="0">Off</div></div></div>
+           <div class="mbtn acc" id="resume">Resume</div>
+           <div class="mbtn" id="restart">Restart</div>
+           <div class="mbtn" id="resetbest">Reset best score</div>
+           <p style="font-size:12px;color:#5F5E5A;margin:0">Swipe: tap rotates, drag moves, slow swipe down soft drops, fast flick down hard drops, swipe up holds.</p>
+          </div>
+          <div id="ov"><h1 id="ovt">Block Stacker</h1><p id="ovp">Tap to play</p><div class="mbtn acc" id="ovb">Start</div></div>
+          <script>
+          var W=10,H=20,COL=['','#1D9E75','#EF9F27','#7F77DD','#639922','#E24B4A','#378ADD','#D85A30'];
+          var SH=[null,[[0,0,0,0],[1,1,1,1],[0,0,0,0],[0,0,0,0]],[[1,1],[1,1]],[[0,1,0],[1,1,1],[0,0,0]],[[0,1,1],[1,1,0],[0,0,0]],[[1,1,0],[0,1,1],[0,0,0]],[[1,0,0],[1,1,1],[0,0,0]],[[0,0,1],[1,1,1],[0,0,0]]];
+          var $=function(i){return document.getElementById(i)};
+          var grid,cur,nextQ,bag,holdT,canHold,score,lines,level,best,state='ready',acc,last,cell=16;
+          var mode=localStorage.getItem('bs_mode')||'both',snd=localStorage.getItem('bs_sound')!=='0';
+          best=+localStorage.getItem('bs_best')||0;
+          var AC=null;
+          function tone(f,d,t,v,s){if(!snd)return;try{AC=AC||new (window.AudioContext||window.webkitAudioContext)();if(AC.state==='suspended')AC.resume();var o=AC.createOscillator(),g=AC.createGain();o.type=t||'square';o.frequency.setValueAtTime(f,AC.currentTime);if(s)o.frequency.exponentialRampToValueAtTime(s,AC.currentTime+d);g.gain.setValueAtTime(v||.08,AC.currentTime);g.gain.exponentialRampToValueAtTime(.0001,AC.currentTime+d);o.connect(g);g.connect(AC.destination);o.start();o.stop(AC.currentTime+d)}catch(e){}}
+          function seq(a,gap){a.forEach(function(f,i){setTimeout(function(){tone(f,.14,'square',.08)},i*gap)})}
+          var SFX={move:function(){tone(220,.04,'square',.05)},rot:function(){tone(440,.06,'square',.06)},lock:function(){tone(120,.1,'triangle',.12)},hd:function(){tone(300,.14,'sawtooth',.08,60)},clear:function(n){seq([523,659,784,1046].slice(0,n+1),70)},over:function(){seq([392,330,262,196],160)}};
+          function newBag(){var b=[1,2,3,4,5,6,7];for(var i=6;i>0;i--){var j=Math.floor(Math.random()*(i+1)),t=b[i];b[i]=b[j];b[j]=t}return b}
+          function pull(){if(!bag||!bag.length)bag=newBag();return bag.pop()}
+          function rot(m){var n=m.length,r=[];for(var i=0;i<n;i++){r.push([]);for(var j=0;j<n;j++)r[i].push(0)}for(i=0;i<n;i++)for(j=0;j<n;j++)r[j][n-1-i]=m[i][j];return r}
+          function fits(m,x,y){for(var r=0;r<m.length;r++)for(var c=0;c<m[r].length;c++)if(m[r][c]){var gx=x+c,gy=y+r;if(gx<0||gx>=W||gy>=H)return false;if(gy>=0&&grid[gy][gx])return false}return true}
+          function spawn(t){var m=SH[t].map(function(r){return r.slice()});cur={t:t,m:m,x:Math.floor((W-m.length)/2),y:t===1?-1:0};if(!fits(cur.m,cur.x,cur.y))gameOver()}
+          function nextPiece(){spawn(nextQ.shift());nextQ.push(pull());canHold=true;drawSide()}
+          function reset(){grid=[];for(var i=0;i<H;i++){grid.push(new Array(W).fill(0))}bag=null;nextQ=[pull(),pull(),pull()];holdT=0;score=0;lines=0;level=1;acc=0;hud();nextPiece()}
+          function start(){reset();state='play';$('ov').style.display='none';last=performance.now()}
+          function gameOver(){state='over';if(score>best){best=score;localStorage.setItem('bs_best',best)}hud();SFX.over();$('ovt').textContent='Game over';$('ovp').textContent='Score '+score+'\nBest '+best;$('ovb').textContent='Play again';$('ov').style.display='flex'}
+          function hud(){$('sc').textContent=score;$('bs').textContent=Math.max(best,score);$('lv').textContent=level;$('ln').textContent=lines}
+          function mv(dx){if(state!=='play')return false;if(fits(cur.m,cur.x+dx,cur.y)){cur.x+=dx;SFX.move();return true}return false}
+          function down(manual){if(state!=='play')return false;if(fits(cur.m,cur.x,cur.y+1)){cur.y++;if(manual){score+=1;hud()}return true}lock();return false}
+          function rotate(){if(state!=='play'||cur.t===2)return;var m=rot(cur.m),k=[0,-1,1,-2,2];for(var i=0;i<k.length;i++)if(fits(m,cur.x+k[i],cur.y)){cur.m=m;cur.x+=k[i];SFX.rot();return}}
+          function hard(){if(state!=='play')return;var n=0;while(fits(cur.m,cur.x,cur.y+1)){cur.y++;n++}score+=2*n;SFX.hd();lock()}
+          function hold(){if(state!=='play'||!canHold)return;var t=cur.t;if(holdT){spawn(holdT);holdT=t}else{holdT=t;nextPiece()}canHold=false;SFX.rot();drawSide()}
+          function lock(){for(var r=0;r<cur.m.length;r++)for(var c=0;c<cur.m[r].length;c++)if(cur.m[r][c]){var gy=cur.y+r;if(gy<0){gameOver();return}grid[gy][cur.x+c]=cur.t}
+          var n=0;for(var y=H-1;y>=0;y--){if(grid[y].every(function(v){return v})){grid.splice(y,1);grid.unshift(new Array(W).fill(0));n++;y++}}
+          if(n){score+=[0,100,300,500,800][n]*level;lines+=n;level=Math.floor(lines/10)+1;SFX.clear(n-1)}else SFX.lock();hud();nextPiece()}
+          function speed(){return Math.max(70,800*Math.pow(.85,level-1))}
+          function loop(t){requestAnimationFrame(loop);if(state==='play'){acc+=t-last;var s=speed();while(acc>=s){acc-=s;down(false)}}last=t;draw()}
+          function cellDraw(x,c,px,py,z,col,a){x.fillStyle=col;x.fillRect(px,py,z,z);var b=Math.max(2,Math.round(z/6));x.fillStyle='rgba(255,255,255,.4)';x.beginPath();x.moveTo(px,py);x.lineTo(px+z,py);x.lineTo(px+z-b,py+b);x.lineTo(px+b,py+b);x.lineTo(px+b,py+z-b);x.lineTo(px,py+z);x.fill();x.fillStyle='rgba(0,0,0,.3)';x.beginPath();x.moveTo(px+z,py+z);x.lineTo(px,py+z);x.lineTo(px+b,py+z-b);x.lineTo(px+z-b,py+z-b);x.lineTo(px+z-b,py+b);x.lineTo(px+z,py);x.fill()}
+          var bc=$('board'),bx=bc.getContext('2d'),dpr=window.devicePixelRatio||1;
+          function draw(){var z=cell;bx.setTransform(dpr,0,0,dpr,0,0);bx.clearRect(0,0,W*z,H*z);bx.strokeStyle='#F1EFE8';bx.lineWidth=1;bx.beginPath();for(var i=1;i<W;i++){bx.moveTo(i*z+.5,0);bx.lineTo(i*z+.5,H*z)}for(i=1;i<H;i++){bx.moveTo(0,i*z+.5);bx.lineTo(W*z,i*z+.5)}bx.stroke();
+          for(var y=0;y<H;y++)for(var x=0;x<W;x++)if(grid&&grid[y][x])cellDraw(bx,0,x*z,y*z,z,COL[grid[y][x]]);
+          if(cur&&state!=='ready'){var gy=cur.y;while(fits(cur.m,cur.x,gy+1))gy++;bx.setLineDash([3,2]);bx.strokeStyle=COL[cur.t];bx.lineWidth=1.5;for(var r=0;r<cur.m.length;r++)for(var c=0;c<cur.m[r].length;c++)if(cur.m[r][c]){if(gy+r>=0)bx.strokeRect((cur.x+c)*z+2,(gy+r)*z+2,z-4,z-4);if(cur.y+r>=0)cellDraw(bx,0,(cur.x+c)*z,(cur.y+r)*z,z,COL[cur.t])}bx.setLineDash([])}}
+          function mini(cv,t,oy,cs){var x=cv.getContext('2d'),m=SH[t],n=m.length,mnx=9,mxx=-1,mny=9,mxy=-1;for(var r=0;r<n;r++)for(var c=0;c<n;c++)if(m[r][c]){mnx=Math.min(mnx,c);mxx=Math.max(mxx,c);mny=Math.min(mny,r);mxy=Math.max(mxy,r)}var w=(mxx-mnx+1)*cs,ox=(cv.width-w)/2;for(r=mny;r<=mxy;r++)for(c=mnx;c<=mxx;c++)if(m[r][c])cellDraw(x,0,ox+(c-mnx)*cs,oy+(r-mny)*cs,cs,COL[t])}
+          function drawSide(){var h=$('hold'),n=$('next');h.getContext('2d').clearRect(0,0,h.width,h.height);n.getContext('2d').clearRect(0,0,n.width,n.height);if(holdT)mini(h,holdT,8,12);for(var i=0;i<3;i++)mini(n,nextQ[i],6+i*46,12)}
+          function resize(){var st=$('stage'),aw=st.clientWidth-2*64-16-4,ah=st.clientHeight-4;cell=Math.max(10,Math.floor(Math.min(aw/W,ah/H)));bc.style.width=W*cell+'px';bc.style.height=H*cell+'px';bc.width=W*cell*dpr;bc.height=H*cell*dpr}
+          function setMode(m){mode=m;localStorage.setItem('bs_mode',m);document.body.className='m-'+m+(document.body.classList.contains('menu')?' menu':'');syncSeg();setTimeout(resize,30)}
+          function setSnd(v){snd=v;localStorage.setItem('bs_sound',v?'1':'0');syncSeg()}
+          function syncSeg(){[].forEach.call($('segmode').children,function(e){e.classList.toggle('on',e.dataset.v===mode)});[].forEach.call($('segsnd').children,function(e){e.classList.toggle('on',(e.dataset.v==='1')===snd)})}
+          function menu(open){document.body.classList.toggle('menu',open);if(state==='play'&&open)state='paused';else if(state==='paused'&&!open){state='play';last=performance.now()}}
+          window.onBack=function(){menu(!document.body.classList.contains('menu'))};
+          window.pauseGame=function(){if(state==='play')menu(true)};
+          $('burger').onclick=function(){menu(true)};$('dim').onclick=$('resume').onclick=function(){menu(false)};
+          $('restart').onclick=function(){menu(false);start()};
+          $('resetbest').onclick=function(){best=0;localStorage.setItem('bs_best',0);hud()};
+          $('segmode').onclick=function(e){if(e.target.dataset.v)setMode(e.target.dataset.v)};
+          $('segsnd').onclick=function(e){if(e.target.dataset.v)setSnd(e.target.dataset.v==='1')};
+          $('ovb').onclick=function(){start()};
+          $('holdbox').onclick=hold;
+          var rep=null,tm=null;
+          function stopRep(){clearTimeout(tm);clearInterval(rep)}
+          function act(a){if(a==='l')mv(-1);else if(a==='r')mv(1);else if(a==='d')down(true);else if(a==='rot')rotate();else if(a==='hd')hard()}
+          [].forEach.call(document.querySelectorAll('.btn'),function(b){var a=b.dataset.a;b.addEventListener('pointerdown',function(e){e.preventDefault();act(a);if(a==='l'||a==='r'||a==='d'){tm=setTimeout(function(){rep=setInterval(function(){act(a)},a==='d'?45:60)},170)}});['pointerup','pointerleave','pointercancel'].forEach(function(ev){b.addEventListener(ev,stopRep)})});
+          var sw=null;
+          $('stage').addEventListener('pointerdown',function(e){if(mode==='buttons'||state!=='play'||e.target.closest('.side'))return;sw={x:e.clientX,y:e.clientY,t:performance.now(),lx:e.clientX,ly:e.clientY,moved:false}});
+          $('stage').addEventListener('pointermove',function(e){if(!sw)return;var dx=e.clientX-sw.lx,dy=e.clientY-sw.ly,s=cell*.9;if(Math.abs(e.clientX-sw.x)>8||Math.abs(e.clientY-sw.y)>8)sw.moved=true;while(dx>=s){mv(1);sw.lx+=s;dx-=s}while(dx<=-s){mv(-1);sw.lx-=s;dx+=s}while(dy>=cell*1.2){down(true);sw.ly+=cell*1.2;dy-=cell*1.2}});
+          function swEnd(e){if(!sw)return;var dt=performance.now()-sw.t,dy=e.clientY-sw.y;if(!sw.moved&&dt<250)rotate();else if(dy>50&&dy/dt>.7)hard();else if(dy<-50&&Math.abs(e.clientX-sw.x)<60)hold();sw=null}
+          $('stage').addEventListener('pointerup',swEnd);$('stage').addEventListener('pointercancel',function(){sw=null});
+          document.addEventListener('keydown',function(e){var k=e.key;if(k==='ArrowLeft')mv(-1);else if(k==='ArrowRight')mv(1);else if(k==='ArrowDown')down(true);else if(k==='ArrowUp')rotate();else if(k===' ')hard();else if(k==='c')hold()});
+          window.addEventListener('resize',resize);
+          grid=[];for(var i=0;i<H;i++)grid.push(new Array(W).fill(0));
+          document.body.className='m-'+mode;syncSeg();hud();resize();last=performance.now();requestAnimationFrame(loop);
+          </script></body></html>
+          EOF_6
+      - name: Build debug APK
+        run: cd game && gradle assembleDebug --no-daemon
+      - uses: actions/upload-artifact@v4
+        with:
+          name: BlockStacker-APK
+          path: game/app/build/outputs/apk/debug/app-debug.apk
